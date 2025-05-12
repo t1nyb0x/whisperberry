@@ -7,6 +7,10 @@
     "src/preload/*.d.ts"
   ],
   "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ES2022",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "composite": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
