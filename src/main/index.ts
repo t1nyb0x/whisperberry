@@ -1,32 +1,93 @@
+import say from 'say'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import path, { join } from 'path'
-import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { electronApp } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { startClipboardWatcher } from './clipboard'
-import { speak } from './tts'
 import { SapiAdapter } from '../voice/plugins/sapi'
-import say from 'say'
+import { VoiceVoxAdapter } from '../voice/plugins/voicevox'
+import { VoiceAdapter } from '../voice/core/VoiceAdapter'
 
-const adapter = new SapiAdapter()
-ipcMain.handle('speak', (_, text: string) => adapter.speak(text))
-ipcMain.handle('stop', () => adapter.stop?.())
+// ① Adapter のマップ
+const adapters: Record<'sapi' | 'voicevox', VoiceAdapter> = {
+  sapi: new SapiAdapter(),
+  voicevox: new VoiceVoxAdapter('http://localhost:50021')
+}
+
+let currentEngine: keyof typeof adapters = 'sapi'
+let currentVoice: string = ''
+
+// ② クリップボード監視を選択中のエンジン + 声で
+startClipboardWatcher(() => ({
+  engine: adapters[currentEngine],
+  voice: currentVoice
+}))
+
+// ③ IPC でエンジン + 声 ID を変更
+ipcMain.handle('setEngine', (_, engine: keyof typeof adapters) => {
+  if (engine in adapters) {
+    currentEngine = engine
+    console.log('[Engine] Current engine switched to:', engine)
+    return true
+  }
+  return false
+})
+
+ipcMain.handle('setVoice', (_, voice: string) => {
+  currentVoice = voice
+  console.log('[Voice] Current voice switched to:', voice)
+  return true
+})
+
+ipcMain.handle('getEngine', () => currentEngine)
+ipcMain.handle('getVoice', () => currentVoice)
+ipcMain.handle('listEngines', () => Object.keys(adapters) as Array<keyof typeof adapters>)
+
+// ④ SAPI の声一覧
 ipcMain.handle('list-voices', () => {
   return new Promise<string[]>((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(say.getInstalledVoices as any)((err: Error | null, voices: string[]) => {
-      if (err) {
-        console.error('Error getting voices:', err)
-        return reject(err)
-      }
+      if (err) return reject(err)
       resolve(voices)
     })
   })
 })
 
+// ⑤ VOICEVOX の話者一覧
+ipcMain.handle('list-speakers', async () => {
+  const vvx = adapters.voicevox as VoiceVoxAdapter
+  return vvx.listSpeakers()
+})
+
+// ⑥ 読み上げ／停止
+ipcMain.handle('speak', (_e, text: string, opts?: { voice?: string; speed?: number }) => {
+  const voice = opts?.voice || currentVoice
+  return adapters[currentEngine].speak(text, { ...opts, voice })
+})
+ipcMain.handle('stop', () => adapters[currentEngine].stop?.())
+
+// ⑦ クリップボード監視はエンジン + 声 ID を共有
+import { clipboard } from 'electron'
+function startClipboardWatcher(getConfig: () => { engine: VoiceAdapter; voice: string }): void {
+  let lastText = ''
+
+  setInterval(() => {
+    const text = clipboard.readText().trim()
+    if (text && text !== lastText) {
+      lastText = text
+      const { engine, voice } = getConfig()
+      console.log('[Clipboard] Speaking:', text, 'with voice:', voice)
+
+      engine.speak(text, { voice }).catch((err) => {
+        console.error('[Clipboard] Failed to speak:', err)
+      })
+    }
+  }, 1000)
+}
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
-  // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -52,7 +113,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // dev / prod 両対応
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']!)
   } else {
@@ -61,40 +121,14 @@ function createWindow(): void {
 }
 
 // This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   createWindow()
-  startClipboardWatcher(speak)
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

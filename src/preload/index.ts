@@ -1,18 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('whisperberry', {
-  speak: (text: string) => ipcRenderer.invoke('speak', text),
-  stop: () => ipcRenderer.invoke('stop'),
-  listVoices: () => ipcRenderer.invoke('list-voices')
+  setEngine: (engine: 'sapi' | 'voicevox') => ipcRenderer.invoke('setEngine', engine),
+  setVoice: (voice: string) => ipcRenderer.invoke('setVoice', voice),
+  getEngine: () => ipcRenderer.invoke('getEngine'),
+  listEngines: () => ipcRenderer.invoke('listEngines'),
+  // SAPI 用
+  listVoices: () => ipcRenderer.invoke('list-voices'),
+  // VOICEVOX 用
+  listSpeakers: () => ipcRenderer.invoke('list-speakers'),
+  speak: (t, opts) => ipcRenderer.invoke('speak', t, opts),
+  stop: () => ipcRenderer.invoke('stop')
 })
-
-declare global {
-  interface Window {
-    whisperberry: {
-      toggle: () => Promise<void>
-      isEnabled: () => Promise<boolean>
-      speak: (text: string) => Promise<ArrayBuffer>
-      stop: () => Promise<void>
-    }
-  }
-}
