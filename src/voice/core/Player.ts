@@ -36,8 +36,11 @@ export class Player {
     this.playing = true
     try {
       const wav = await this.adapter.speak(item.text, item.opts)
+      const blob = new Blob([wav], { type: 'audio/wav' })
+      const url = URL.createObjectURL(blob)
+
       this.audio?.pause()
-      this.audio = new Audio(URL.createObjectURL(new Blob([wav])))
+      this.audio = new Audio(url)
       this.audio.onended = () => this.next()
       this.audio.play()
     } catch (err) {

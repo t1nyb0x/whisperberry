@@ -43,6 +43,7 @@ function App(): React.JSX.Element {
       {/* ⑤ 再生ボタン */}
       <button
         className="px-4 py-2 bg-blue-600 text-white rounded"
+        disabled={!inputText.trim()}
         onClick={() => player.enqueue(inputText, { voice: selected })}
       >
         読み上げスタート
