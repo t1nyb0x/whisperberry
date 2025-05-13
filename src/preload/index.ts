@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('whisperberry', {
-  toggle: () => ipcRenderer.invoke('toggle'),
-  isEnabled: () => ipcRenderer.invoke('status')
+  speak: (text: string) => ipcRenderer.invoke('speak', text),
+  stop: () => ipcRenderer.invoke('stop'),
+  listVoices: () => ipcRenderer.invoke('list-voices')
 })
 
 declare global {
@@ -10,6 +11,8 @@ declare global {
     whisperberry: {
       toggle: () => Promise<void>
       isEnabled: () => Promise<boolean>
+      speak: (text: string) => Promise<ArrayBuffer>
+      stop: () => Promise<void>
     }
   }
 }

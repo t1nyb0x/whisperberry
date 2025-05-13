@@ -3,8 +3,9 @@ export {}
 declare global {
   interface Window {
     whisperberry: {
-      toggle: () => Promise<void>
-      isEnabled: () => Promise<boolean>
+      speak(text: string): Promise<ArrayBuffer>
+      stop(): Promise<void> | void
+      listVoices(): Promise<string[]>
     }
   }
 }

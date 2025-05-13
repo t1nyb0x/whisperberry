@@ -4,6 +4,24 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { startClipboardWatcher } from './clipboard'
 import { speak } from './tts'
+import { SapiAdapter } from '../voice/plugins/sapi'
+import say from 'say'
+
+const adapter = new SapiAdapter()
+ipcMain.handle('speak', (_, text: string) => adapter.speak(text))
+ipcMain.handle('stop', () => adapter.stop?.())
+ipcMain.handle('list-voices', () => {
+  return new Promise<string[]>((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(say.getInstalledVoices as any)((err: Error | null, voices: string[]) => {
+      if (err) {
+        console.error('Error getting voices:', err)
+        return reject(err)
+      }
+      resolve(voices)
+    })
+  })
+})
 
 function createWindow(): void {
   // Create the browser window.

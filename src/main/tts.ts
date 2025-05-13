@@ -16,8 +16,7 @@ const hasTTS = (() => {
 
 let speaking = false
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export function speak(text: string) {
+export function speak(text: string): void {
   if (!hasTTS) {
     console.warn('[TTS] No Linux speech backend; skipping.')
     return
